@@ -25,8 +25,6 @@ class CNN(BasicModule):
             nn.Linear(64 * 6 * 6, 256),
             nn.ReLU(inplace=True),
             nn.Dropout(),
-            nn.Linear(256, 256),
-            nn.ReLU(inplace=True),
             nn.Linear(256, num_classes),
         )
 
