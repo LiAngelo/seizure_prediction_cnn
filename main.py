@@ -79,9 +79,7 @@ def train(**kwargs):
                 if os.path.exists(opt.debug_file):
                     import ipdb;
                     ipdb.set_trace()
-        #model.save()
-        #name = time.strftime('model' + '%m%d_%H:%M:%S.pth')
-        #t.save(model.state_dict(), './checkpoints/' + name)
+        model.save()
 
         """计算验证集上的指标及可视化"""
         val_cm, val_accuracy = val(model, val_dataloader)

@@ -49,7 +49,8 @@ class Ictal(data.Dataset):
             else:
                 self.transforms = T.Compose([
                     T.Scale(256),
-                    T.RandomSizedCrop(224),
+                    T.RandomSizedCrop(224, 6),
+                    # T.RandomSizedCrop(224),
                     T.RandomHorizontalFlip(),
                     T.ToTensor(),
                     normalize

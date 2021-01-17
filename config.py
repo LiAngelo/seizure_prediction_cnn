@@ -3,7 +3,7 @@ import warnings
 
 class DefaultConfig(object):
     env = 'default'
-    model = 'CNN'
+    model = 'CNN_1d'
 
     train_data_root = './data/train/'
     test_data_root = './data/test/'
