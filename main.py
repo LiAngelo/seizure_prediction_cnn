@@ -1,174 +1,178 @@
+# coding=utf-8
+"""
+ 主程序：主要完成四个功能
+（1）训练：定义网络，损失函数，优化器，进行训练，生成模型
+（2）验证：验证模型准确率
+（3）测试：测试模型在测试集上的准确率
+（4）help：打印log信息
+
+"""
+
 from config import opt
 import os
-import torch as t
 import models
-from utils.visualize import Visualizer
+import torch as t
 from data.dataset import Ictal
 from torch.utils.data import DataLoader
-from torch.autograd import Variable
 from torchnet import meter
-from tqdm import tqdm
+from torch.autograd import Variable
+# from torchvision import models
+from torch import nn
+import time
+import csv
 
-
-def test(**kwargs):
-    opt.parse(kwargs)
-    import ipdb;
-    ipdb.set_trace()
-    # configure model
-    model = getattr(models, opt.model)().eval()
-    if opt.load_model_path:
-        model.load(opt.load_model_path)
-    if opt.use_gpu: model.cuda()
-
-    # data
-    train_data = Ictal(opt.test_data_root, test=True)
-    test_dataloader = DataLoader(train_data, batch_size=opt.batch_size, shuffle=False, num_workers=opt.num_workers)
-    results = []
-    for ii, (data, path) in enumerate(test_dataloader):
-        input = t.autograd.Variable(data, volatile=True)
-        if opt.use_gpu: input = input.cuda()
-        score = model(input)
-        probability = t.nn.functional.softmax(score)[:, 0].data.tolist()
-        # label = score.max(dim = 1)[1].data.tolist()
-
-        batch_results = [(path_, probability_) for path_, probability_ in zip(path, probability)]
-
-        results += batch_results
-    write_csv(results, opt.result_file)
-
-    return results
-
-
-def write_csv(results, file_name):
-    import csv
-    with open(file_name, 'w') as f:
-        writer = csv.writer(f)
-        writer.writerow(['id', 'label'])
-        writer.writerows(results)
+"""模型训练：定义网络，定义数据，定义损失函数和优化器，训练并计算指标，计算在验证集上的准确率"""
 
 
 def train(**kwargs):
+    """根据命令行参数更新配置"""
     opt.parse(kwargs)
-    vis = Visualizer(opt.env)
 
-    # step1: configure model
+    """(1)step1：加载网络，若有预训练模型也加载"""
     model = getattr(models, opt.model)()
-    if opt.load_model_path:
-        model.load(opt.load_model_path)
-    if opt.use_gpu:
-        model.cuda()
 
-    # step2: data
-    train_data = Ictal(opt.train_data_root, train=True)
-    val_data = Ictal(opt.train_data_root, train=False)
-    train_dataloader = DataLoader(train_data, opt.batch_size,
-                                  shuffle=True, num_workers=opt.num_workers)
-    val_dataloader = DataLoader(val_data, opt.batch_size,
-                                shuffle=False, num_workers=opt.num_workers)
+    """(2)step2：处理数据"""
+    train_data = Ictal(opt.train_data_root, train=True)  # 训练集
+    val_data = Ictal(opt.train_data_root, train=False)  # 验证集
 
-    # step3: criterion and optimizer
-    criterion = t.nn.CrossEntropyLoss()
-    lr = opt.lr
-    optimizer = t.optim.Adam(model.parameters(), lr=lr, weight_decay=opt.weight_decay)
+    train_dataloader = DataLoader(train_data, opt.batch_size, shuffle=True, num_workers=opt.num_workers)
+    val_dataloader = DataLoader(val_data, opt.batch_size, shuffle=False, num_workers=opt.num_workers)
 
-    # step4: meters
+    """(3)step3：定义损失函数和优化器"""
+    criterion = t.nn.CrossEntropyLoss()  # 交叉熵损失
+    lr = opt.lr  # 学习率
+    optimizer = t.optim.SGD(model.parameters(), lr=opt.lr, weight_decay=opt.weight_decay)
+
+    """(4)step4：统计指标，平滑处理之后的损失，还有混淆矩阵"""
     loss_meter = meter.AverageValueMeter()
     confusion_matrix = meter.ConfusionMeter(2)
-    previous_loss = 1e100
+    previous_loss = 1e10
 
-    # train
+    """(5)开始训练"""
     for epoch in range(opt.max_epoch):
 
         loss_meter.reset()
         confusion_matrix.reset()
 
-        for ii, (data, label) in tqdm(enumerate(train_dataloader), total=len(train_data)):
-
-            # train model
+        for ii, (data, label) in enumerate(train_dataloader):
+            # 训练模型参数
             input = Variable(data)
             target = Variable(label)
-            if opt.use_gpu:
-                input = input.cuda()
-                target = target.cuda()
 
+            # 梯度清零
             optimizer.zero_grad()
             score = model(input)
+
             loss = criterion(score, target)
-            loss.backward()
+            loss.backward()  # 反向传播
+
+            # 更新参数
             optimizer.step()
 
-            # meters update and visualize
-            loss_meter.add(loss.data[0])
-            confusion_matrix.add(score.data, target.data)
+            # 更新统计指标及可视化
+            loss_meter.add(loss.item())
+            # print score.shape,target.shape
+            confusion_matrix.add(score.detach(), target.detach())
 
             if ii % opt.print_freq == opt.print_freq - 1:
-                vis.plot('loss', loss_meter.value()[0])
 
-                # 进入debug模式
                 if os.path.exists(opt.debug_file):
                     import ipdb;
                     ipdb.set_trace()
+        #model.save()
+        #name = time.strftime('model' + '%m%d_%H:%M:%S.pth')
+        #t.save(model.state_dict(), './checkpoints/' + name)
 
-        model.save()
-
-        # validate and visualize
+        """计算验证集上的指标及可视化"""
         val_cm, val_accuracy = val(model, val_dataloader)
+        tra_cm, tra_accuracy = val(model, train_dataloader)
 
-        vis.plot('val_accuracy', val_accuracy)
-        vis.log("epoch:{epoch},lr:{lr},loss:{loss},train_cm:{train_cm},val_cm:{val_cm}".format(
-            epoch=epoch, loss=loss_meter.value()[0], val_cm=str(val_cm.value()), train_cm=str(confusion_matrix.value()),
-            lr=lr))
+        print("epoch:", epoch, "loss:", loss_meter.value()[0], "val_accuracy:", val_accuracy,
+              "tra_accuracy:", tra_accuracy)
 
-        # update learning rate
+        """如果损失不再下降，则降低学习率"""
         if loss_meter.value()[0] > previous_loss:
             lr = lr * opt.lr_decay
-            # 第二种降低学习率的方法:不会有moment等信息的丢失
             for param_group in optimizer.param_groups:
-                param_group['lr'] = lr
+                param_group["lr"] = lr
 
         previous_loss = loss_meter.value()[0]
 
 
+"""计算模型在验证集上的准确率等信息"""
+
+
+@t.no_grad()
 def val(model, dataloader):
-    '''
-    计算模型在验证集上的准确率等信息
-    '''
-    model.eval()
+    model.eval()  # 将模型设置为验证模式
+
     confusion_matrix = meter.ConfusionMeter(2)
     for ii, data in enumerate(dataloader):
         input, label = data
         val_input = Variable(input, volatile=True)
-        val_label = Variable(label.type(t.LongTensor), volatile=True)
-        if opt.use_gpu:
-            val_input = val_input.cuda()
-            val_label = val_label.cuda()
-        score = model(val_input)
-        confusion_matrix.add(score.data.squeeze(), label.type(t.LongTensor))
+        val_label = Variable(label.long(), volatile=True)
 
-    model.train()
+        score = model(val_input)
+        confusion_matrix.add(score.detach().squeeze(), label.long())
+
+    model.train()  # 模型恢复为训练模式
     cm_value = confusion_matrix.value()
     accuracy = 100. * (cm_value[0][0] + cm_value[1][1]) / (cm_value.sum())
+
     return confusion_matrix, accuracy
 
 
-def help():
-    '''
-    打印帮助的信息： python file.py help
-    '''
+""""""
 
-    print('''
-    usage : python file.py <function> [--args=value]
-    <function> := train | test | help
-    example: 
-            python {0} train --env='env0701' --lr=0.01
-            python {0} test --dataset='path/to/dataset/root/'
-            python {0} help
-    avaiable args:'''.format(__file__))
 
-    from inspect import getsource
-    source = (getsource(opt.__class__))
-    print(source)
+def test(**kwargs):
+    opt.parse(kwargs)
+
+    # data
+    test_data = Ictal(opt.test_data_root, test=True)
+    test_dataloader = DataLoader(test_data, batch_size=opt.batch_size, shuffle=False, num_workers=opt.num_workers)
+    results = []
+
+    # model
+    # model.load_state_dict(t.load('./model.pth'))
+    model = getattr(models, opt.model)()
+    model.eval()
+
+    for ii, (data, path) in enumerate(test_dataloader):
+        input = Variable(data, volatile=True)
+
+        score = model(input)
+        path = path.numpy().tolist()
+        # print path
+        # print score.data,"+++++"
+        _, predicted = t.max(score.data, 1)
+        # print "***************"
+        # print predicted
+        predicted = predicted.data.cpu().numpy().tolist()
+        res = ""
+        for (i, j) in zip(path, predicted):
+            if j == 1:
+                res = "Pre"
+            else:
+                res = "Inter"
+            results.append([i, "".join(res)])
+    # print results
+
+    write_csv(results, opt.result_file)
+    return results
+
+
+""""""
+
+
+def write_csv(results, file_name):
+    with open(file_name, "w") as f:
+        writer = csv.writer(f)
+        writer.writerow(['id', 'label'])
+        writer.writerows(results)
 
 
 if __name__ == '__main__':
     import fire
+
+    fire.Fire()

@@ -18,9 +18,9 @@ class Ictal(data.Dataset):
         # test: data/test/8973.jpg
         # train: data/train/cat.10004.jpg
         if self.test:
-            imgs = sorted(imgs, key=lambda x: int(x.split('.')[-2].split('/')[-1]))
+            imgs = sorted(imgs, key=lambda x: int(x.split('_')[-3]))
         else:
-            imgs = sorted(imgs, key=lambda x: int(x.split('.')[-2]))
+            imgs = sorted(imgs, key=lambda x: int(x.split('_')[-3]))
 
         imgs_num = len(imgs)
 
@@ -61,7 +61,7 @@ class Ictal(data.Dataset):
         '''
         img_path = self.imgs[index]
         if self.test:
-            label = int(self.imgs[index].split('.')[-2].split('/')[-1])
+            label = int(self.imgs[index].split('.')[-2].split('_')[-3])
         else:
             label = 1 if 'pre' in img_path.split('/')[-1] else 0
         data = Image.open(img_path)
