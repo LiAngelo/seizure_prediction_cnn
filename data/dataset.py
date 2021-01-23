@@ -15,8 +15,8 @@ class Ictal(data.Dataset):
         self.test = test
         imgs = [os.path.join(root, img) for img in os.listdir(root)]
 
-        # test: data/test/8973.jpg
-        # train: data/train/cat.10004.jpg
+        # test: data/test/
+        # train: data/train/inter_7_0_1.jpg
         if self.test:
             imgs = sorted(imgs, key=lambda x: int(x.split('_')[-3]))
         else:
@@ -41,19 +41,20 @@ class Ictal(data.Dataset):
 
             if self.test or not train:
                 self.transforms = T.Compose([
-                    T.Scale(224),
-                    T.CenterCrop(224),
+                    T.Scale((224, 6)),
+                    T.CenterCrop((224, 6)),
                     T.ToTensor(),
                     normalize
                 ])
             else:
                 self.transforms = T.Compose([
-                    T.Scale(256),
-                    T.RandomSizedCrop(224, 6),
+                    T.Grayscale(num_output_channels=1),
+                    T.Scale((256, 6)),
+                    T.RandomSizedCrop((224, 6)),
                     # T.RandomSizedCrop(224),
                     T.RandomHorizontalFlip(),
                     T.ToTensor(),
-                    normalize
+                    #normalize
                 ])
 
     def __getitem__(self, index):
@@ -67,6 +68,7 @@ class Ictal(data.Dataset):
             label = 1 if 'pre' in img_path.split('/')[-1] else 0
         data = Image.open(img_path)
         data = self.transforms(data)
+        data = np.squeeze(data)
         return data, label
 
     def __len__(self):

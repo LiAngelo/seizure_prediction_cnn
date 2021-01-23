@@ -7,7 +7,9 @@ class DefaultConfig(object):
 
     train_data_root = './data/train/'
     test_data_root = './data/test/'
-    load_model_path = None
+    # train_data_root = './data/grey/train/'
+    # test_data_root = './data/grey/test/'
+    #load_model_path = None
 
     batch_size = 128
     num_workers = 4
@@ -16,7 +18,7 @@ class DefaultConfig(object):
     debug_file = '/tmp/debug'
     result_file = 'result.csv'
 
-    max_epoch = 100
+    max_epoch = 2
     lr = 0.1
     lr_decay = 0.95
     weight_decay = 1e-4

@@ -53,10 +53,12 @@ def train(**kwargs):
 
         loss_meter.reset()
         confusion_matrix.reset()
-
         for ii, (data, label) in enumerate(train_dataloader):
             # 训练模型参数
             input = Variable(data)
+
+            input = input.permute(0, 2, 1)
+
             target = Variable(label)
 
             # 梯度清零
@@ -79,7 +81,7 @@ def train(**kwargs):
                 if os.path.exists(opt.debug_file):
                     import ipdb;
                     ipdb.set_trace()
-        model.save()
+        #model.save()
 
         """计算验证集上的指标及可视化"""
         val_cm, val_accuracy = val(model, val_dataloader)
