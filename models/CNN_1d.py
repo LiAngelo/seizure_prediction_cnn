@@ -19,17 +19,19 @@ class CNN_1d(BasicModule):
             ## nn.ReLU(inplace=True),
             ## nn.MaxPool1d(kernel_size=3, stride=2),
 
-            # nn.Conv1d(224, 64, 3),
+            # nn.Conv1d(6, 6, 3),
             # nn.ReLU(),
             # nn.Dropout(),
+            # nn.Conv1d(6, 6, 3),
+            # nn.ReLU(),
 
-            nn.Conv1d(6, 6, kernel_size=11, stride=4, padding=2),
+            nn.Conv1d(6, 16, kernel_size=11, stride=4, padding=2),
             nn.ReLU(inplace=True),
             nn.MaxPool1d(kernel_size=3, stride=2),
-            nn.Conv1d(6, 6, kernel_size=5, padding=2),
+            nn.Conv1d(16, 32, kernel_size=5, padding=2),
             nn.ReLU(inplace=True),
             nn.MaxPool1d(kernel_size=3, stride=2),
-            nn.Conv1d(6, 6, kernel_size=3, padding=1),
+            nn.Conv1d(32, 64, kernel_size=3, padding=1),
             nn.ReLU(inplace=True),
             nn.MaxPool1d(kernel_size=3, stride=2),
         )
@@ -41,18 +43,16 @@ class CNN_1d(BasicModule):
             ## nn.Dropout(),
             ## nn.Linear(256, num_classes),
             nn.Dropout(),
-            nn.Linear(128 * 6 * 6, 128),
-            nn.ReLU(),
-            nn.Dropout(),
-            nn.Linear(128, num_classes),
+            nn.Linear(64 * 6, num_classes),
+
+            # nn.ReLU(),
+            # nn.Dropout(),
+            # nn.Linear(128, num_classes),
         )
 
     def forward(self, x):
         x = self.features(x)
-        print(x.shape)
-        print(x.size(0))
-        # x = x.view(x.size(0), 64 * 6 * 6)
-        x = x.view(x.size(0), 128 * 6 * 6)
+        x = x.view(x.size(0), 64 * 6)
         x = self.classifier(x)
         return x
 

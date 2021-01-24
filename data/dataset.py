@@ -7,7 +7,7 @@ from torchvision import transforms as T
 
 class Ictal(data.Dataset):
 
-    def __init__(self, root, transforms=None, train=True, test=False):
+    def __init__(self, root, model_name, transforms=None, train=True, test=False):
         '''
         Get all images, split the data into train, test
         主要目标： 获取所有图片的地址，并根据训练，验证，测试划分数据
@@ -40,22 +40,46 @@ class Ictal(data.Dataset):
                                     std=[0.229, 0.224, 0.225])
 
             if self.test or not train:
-                self.transforms = T.Compose([
-                    T.Scale((224, 6)),
-                    T.CenterCrop((224, 6)),
-                    T.ToTensor(),
-                    normalize
-                ])
+                if model_name == 'CNN_1d':
+                    self.transforms = T.Compose([
+                        T.Grayscale(num_output_channels=1),
+                        T.Scale((256, 6)),
+                        T.RandomSizedCrop((224, 6)),
+                        T.RandomHorizontalFlip(),
+                        T.ToTensor(),
+                        
+                    ])
+                elif model_name == 'CNN_2d':
+                    self.transforms = T.Compose([
+                        # T.Scale((224, 6)),
+                        # T.CenterCrop((224, 6)),
+                        # T.ToTensor(),
+                        # c
+
+                        T.Scale((256, 6)),
+                        T.RandomSizedCrop((224, 6)),
+                        T.RandomHorizontalFlip(),
+                        T.ToTensor(),
+                        normalize
+                    ])
             else:
-                self.transforms = T.Compose([
-                    T.Grayscale(num_output_channels=1),
-                    T.Scale((256, 6)),
-                    T.RandomSizedCrop((224, 6)),
-                    # T.RandomSizedCrop(224),
-                    T.RandomHorizontalFlip(),
-                    T.ToTensor(),
-                    #normalize
-                ])
+                if model_name == 'CNN_1d':
+                    self.transforms = T.Compose([
+                        T.Grayscale(num_output_channels=1),
+                        T.Scale((256, 6)),
+                        T.RandomSizedCrop((224, 6)),
+                        T.RandomHorizontalFlip(),
+                        T.ToTensor(),
+                    ])
+                elif model_name == 'CNN_2d':
+                    self.transforms = T.Compose([
+                        T.Scale((256, 6)),
+                        T.RandomSizedCrop((224, 6)),
+                        T.RandomHorizontalFlip(),
+                        T.ToTensor(),
+                        normalize
+                    ])
+
 
     def __getitem__(self, index):
         '''

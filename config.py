@@ -18,7 +18,7 @@ class DefaultConfig(object):
     debug_file = '/tmp/debug'
     result_file = 'result.csv'
 
-    max_epoch = 2
+    max_epoch = 200
     lr = 0.1
     lr_decay = 0.95
     weight_decay = 1e-4

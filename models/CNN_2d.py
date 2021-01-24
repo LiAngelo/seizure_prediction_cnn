@@ -32,7 +32,6 @@ class CNN_2d(BasicModule):
 
     def forward(self, x):
         x = self.features(x)
-        # print(x.shape)
         x = x.view(x.size(0), 64 * 6 * 6)
         x = self.classifier(x)
         return x

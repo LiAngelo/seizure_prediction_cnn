@@ -32,8 +32,8 @@ def train(**kwargs):
     model = getattr(models, opt.model)()
 
     """(2)step2：处理数据"""
-    train_data = Ictal(opt.train_data_root, train=True)  # 训练集
-    val_data = Ictal(opt.train_data_root, train=False)  # 验证集
+    train_data = Ictal(opt.train_data_root, opt.model, train=True)  # 训练集
+    val_data = Ictal(opt.train_data_root, opt.model, train=False)  # 验证集
 
     train_dataloader = DataLoader(train_data, opt.batch_size, shuffle=True, num_workers=opt.num_workers)
     val_dataloader = DataLoader(val_data, opt.batch_size, shuffle=False, num_workers=opt.num_workers)
@@ -50,14 +50,13 @@ def train(**kwargs):
 
     """(5)开始训练"""
     for epoch in range(opt.max_epoch):
-
         loss_meter.reset()
         confusion_matrix.reset()
         for ii, (data, label) in enumerate(train_dataloader):
             # 训练模型参数
             input = Variable(data)
-
-            input = input.permute(0, 2, 1)
+            if opt.model == 'CNN_1d':
+                input = input.permute(0, 2, 1)
 
             target = Variable(label)
 
@@ -73,7 +72,7 @@ def train(**kwargs):
 
             # 更新统计指标及可视化
             loss_meter.add(loss.item())
-            # print score.shape,target.shape
+            # print score.shape, target.shape
             confusion_matrix.add(score.detach(), target.detach())
 
             if ii % opt.print_freq == opt.print_freq - 1:
@@ -84,8 +83,8 @@ def train(**kwargs):
         #model.save()
 
         """计算验证集上的指标及可视化"""
-        val_cm, val_accuracy = val(model, val_dataloader)
-        tra_cm, tra_accuracy = val(model, train_dataloader)
+        val_cm, val_accuracy = val(model, val_dataloader, opt.model)
+        tra_cm, tra_accuracy = val(model, train_dataloader, opt.model)
 
         print("epoch:", epoch, "loss:", loss_meter.value()[0], "val_accuracy:", val_accuracy,
               "tra_accuracy:", tra_accuracy)
@@ -103,12 +102,15 @@ def train(**kwargs):
 
 
 @t.no_grad()
-def val(model, dataloader):
+def val(model, dataloader, model_name):
     model.eval()  # 将模型设置为验证模式
 
     confusion_matrix = meter.ConfusionMeter(2)
     for ii, data in enumerate(dataloader):
         input, label = data
+        if model_name == 'CNN_1d':
+            input = input.permute(0, 2, 1)
+
         val_input = Variable(input, volatile=True)
         val_label = Variable(label.long(), volatile=True)
 
