@@ -16,6 +16,7 @@ from data.dataset import Ictal
 from torch.utils.data import DataLoader
 from torchnet import meter
 from torch.autograd import Variable
+from utils.visualize import Visualizer
 # from torchvision import models
 from torch import nn
 import time
@@ -27,6 +28,7 @@ import csv
 def train(**kwargs):
     """根据命令行参数更新配置"""
     opt.parse(kwargs)
+    vis = Visualizer(opt.env)
 
     """(1)step1：加载网络，若有预训练模型也加载"""
     model = getattr(models, opt.model)()
@@ -48,6 +50,7 @@ def train(**kwargs):
     confusion_matrix = meter.ConfusionMeter(2)
     previous_loss = 1e10
 
+    start = time.time()
     """(5)开始训练"""
     for epoch in range(opt.max_epoch):
         loss_meter.reset()
@@ -76,14 +79,19 @@ def train(**kwargs):
             confusion_matrix.add(score.detach(), target.detach())
 
             if ii % opt.print_freq == opt.print_freq - 1:
-
+                vis.plot('loss', loss_meter.value()[0])
                 if os.path.exists(opt.debug_file):
                     import ipdb;
                     ipdb.set_trace()
-        #model.save()
+        model.save(epoch)
 
         """计算验证集上的指标及可视化"""
         val_cm, val_accuracy = val(model, val_dataloader, opt.model)
+        vis.plot('val_accuracy', val_accuracy)
+        vis.log("epoch:{epoch},lr:{lr},loss:{loss},train_cm:{train_cm},val_cm:{val_cm}".
+                format(epoch=epoch, loss=loss_meter.value()[0], val_cm=str(val_cm.value()),
+                       train_cm=str(confusion_matrix.value()), lr=lr))
+
         tra_cm, tra_accuracy = val(model, train_dataloader, opt.model)
 
         print("epoch:", epoch, "loss:", loss_meter.value()[0], "val_accuracy:", val_accuracy,
@@ -96,6 +104,9 @@ def train(**kwargs):
                 param_group["lr"] = lr
 
         previous_loss = loss_meter.value()[0]
+    end = time.time()
+
+    print(end-start)
 
 
 """计算模型在验证集上的准确率等信息"""
@@ -112,7 +123,7 @@ def val(model, dataloader, model_name):
             input = input.permute(0, 2, 1)
 
         val_input = Variable(input, volatile=True)
-        val_label = Variable(label.long(), volatile=True)
+        # val_label = Variable(label.long(), volatile=True)
 
         score = model(val_input)
         confusion_matrix.add(score.detach().squeeze(), label.long())
@@ -130,15 +141,14 @@ def val(model, dataloader, model_name):
 def test(**kwargs):
     opt.parse(kwargs)
 
+    # model
+    model = getattr(models, opt.model)()
+    model.load(opt.load_model_path)
+
     # data
-    test_data = Ictal(opt.test_data_root, test=True)
+    test_data = Ictal(opt.test_data_root, opt.model, test=True)
     test_dataloader = DataLoader(test_data, batch_size=opt.batch_size, shuffle=False, num_workers=opt.num_workers)
     results = []
-
-    # model
-    # model.load_state_dict(t.load('./model.pth'))
-    model = getattr(models, opt.model)()
-    model.eval()
 
     for ii, (data, path) in enumerate(test_dataloader):
         input = Variable(data, volatile=True)
@@ -154,9 +164,9 @@ def test(**kwargs):
         res = ""
         for (i, j) in zip(path, predicted):
             if j == 1:
-                res = "Pre"
+                res = "1"
             else:
-                res = "Inter"
+                res = "0"
             results.append([i, "".join(res)])
     # print results
 
@@ -168,7 +178,7 @@ def test(**kwargs):
 
 
 def write_csv(results, file_name):
-    with open(file_name, "w") as f:
+    with open(file_name, "w", newline='') as f:
         writer = csv.writer(f)
         writer.writerow(['id', 'label'])
         writer.writerows(results)
